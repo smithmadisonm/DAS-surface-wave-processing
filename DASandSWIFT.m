@@ -4,9 +4,11 @@
 %
 clear all 
 
-DASdatapath = '/Users/jthomson/Desktop/dasncdf/';
+%DASdatapath = '/Users/jthomson/Desktop/dasncdf/';
+DASdatapath = '/Volumes/Data/BeaufortChukchi/OliktokDAS/DAS_Aug2022';
 
-channel = [100:100:18400];
+channel = [100:20:18400];
+plotflag = false;
 
 %% SWIFT data
 
@@ -66,6 +68,8 @@ for ci=1:length(channel) % position loop
 
     %% plots for this channel
 
+    if plotflag
+        
     figure(2)
 
     subplot(3,1,1)
@@ -95,6 +99,8 @@ for ci=1:length(channel) % position loop
 
     print('-dpng',[DASdatapath  '/' num2str(channel(ci)) '/DAS-SWIFTcompare_channel'  num2str(channel(ci)) '.png'])
 
+    else
+    end
 
 end
 
