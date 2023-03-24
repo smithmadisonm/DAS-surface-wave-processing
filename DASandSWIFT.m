@@ -2,13 +2,16 @@
 %
 % J. Thomson, 12/2022
 %
-clear all 
+clear all, close all
+
+tic
 
 %DASdatapath = '/Users/jthomson/Desktop/dasncdf/';
 DASdatapath = '/Volumes/Data/BeaufortChukchi/OliktokDAS/DAS_Aug2022';
 
 channel = [100:20:18400];
 plotflag = false;
+movieflag = false;
 
 %% SWIFT data
 
@@ -23,7 +26,12 @@ Hs_SWIFT = [SWIFT.sigwaveheight];
 
 %% loop thru DAS data, in directories by channel (location) and files by time
 
+
+
 for ci=1:length(channel) % position loop
+
+    vidObj = VideoWriter([DASdatapath '/' num2str(channel(ci))  '/DASchannel'  num2str(channel(ci)) '.mpeg' ],'MPEG-4');
+    open(vidObj);
 
     flist = dir([DASdatapath '/' num2str(channel(ci)) '/*.ncdf']);
 
@@ -41,36 +49,51 @@ for ci=1:length(channel) % position loop
         clear year month day hour minute second
 
         % spectra
+        cleandata = filloutliers( detrend(data), 'linear');
         [thisE thisf ] = pwelch(data,[],[],[],2);
         E_DAS(fi,:) = interp1(thisf, thisE, f); % interpolate onto SWIFT frequencies
-        clear this* data
 
         % compare with SWIFT
         [tdiff matchedindex] = min( abs( time_DAS(fi) - time_SWIFT ) );
         if tdiff < 1/24
             E_ratio(fi,:) = E_SWIFT(matchedindex,:) ./ E_DAS(fi,:);
+            Hs_SWIFT_atDAStime(fi) = Hs_SWIFT(matchedindex);
         else
             E_ratio(fi,:) = NaN * E_SWIFT(matchedindex,:) ./ E_DAS(fi,:);
+            Hs_SWIFT_atDAStime = NaN;
         end
 
-        %figure(1),
-        %loglog(f,E);
-
+        if movieflag
+            figure(1), clf       
+            subplot(2,1,1)
+            plot(data,'b'), hold on, plot(cleandata,'r')
+            title(flist(fi).name)
+            subplot(2,1,2)
+            loglog(thisf,thisE,'b', f,E_DAS(fi,:),'r');
+            axis square
+            currFrame = getframe(gcf);
+            writeVideo(vidObj,currFrame);
+        end
+        
+        clear this* data
+        
     end
 
+    close(vidObj);
+    
     E_coef = nanmean(E_ratio); % time average of the ratio at each frequency
     E_coefstddev = nanstd(E_ratio); % standard deviation of the ratio at each frequency
     E_DAS = E_DAS.*E_coef; % calibrated sea surface elevation energy spectra from the DAS
 
-    Hs_DAS = 4*nansum(E_DAS*df,2).^.5;
+    Hs_DAS = 4*nansum(E_DAS.*df,2).^.5;
 
-    save([DASdatapath '/' num2str(channel(ci))  '/DASspecta_channel'  num2str(channel(ci)) '.mat'],'E*','f*','time*')
+    save([DASdatapath '/' num2str(channel(ci))  '/DASspecta_channel'  num2str(channel(ci)) '.mat'],'E*','f*','time*','Hs*')
 
     %% plots for this channel
 
     if plotflag
         
-    figure(2)
+    figure(2), clf
 
     subplot(3,1,1)
     plot(time_DAS,Hs_DAS,'x',time_SWIFT,Hs_SWIFT)
@@ -99,26 +122,51 @@ for ci=1:length(channel) % position loop
 
     print('-dpng',[DASdatapath  '/' num2str(channel(ci)) '/DAS-SWIFTcompare_channel'  num2str(channel(ci)) '.png'])
 
+    figure(3), clf
+    loglog(f,E_ratio,'color',[.5 .5 .5]), hold on
+    loglog(f,nanmean(E_ratio),'k','linewidth',3)
+    loglog(f,nanmedian(E_ratio),'c','linewidth',3)
+    xlabel('f [Hz]'), ylabel('E ratio')
+    title(['DAS channel ' num2str(channel(ci))])
+    print('-dpng',[DASdatapath  '/' num2str(channel(ci)) '/Eratio_channel'  num2str(channel(ci)) '.png'])
+  
     else
     end
 
 end
 
+toc
+
+
 %% combined results (all chanels, all times)
 % 
-% save('/Users/jthomson/Dropbox/Projects/ArcticCable/2022/DASresults.mat','time','channel','Hs*')
-% 
-% %% more plots (all channels)
-% 
-% figure(3),clf
-% pcolor(time,channel,Hs_DAS_all'./1000)
-% datetick
-% ylabel('channel (distance)')
-% cb = colorbar;
-% cb.Label.String = 'DAS wave height';
-% 
-% print('-dpng','/Users/jthomson/Dropbox/Projects/ArcticCable/2022/DAS_Hs_channel.png')
-% 
+
+for ci=1:length(channel) 
+    
+    load([DASdatapath '/' num2str(channel(ci))  '/DASspecta_channel'  num2str(channel(ci)) '.mat'])
+    
+    figure(4), 
+    cmap = colormap;
+    cindex = ceil(ci./length(channel)*length(cmap));
+    plot(Hs_SWIFT_atDAStime,Hs_DAS,'.','color',cmap(cindex,:))
+    hold on
+    
+    figure(5),
+    cmap = colormap;
+    cindex = ceil(ci./length(channel)*length(cmap));
+    loglog(f,E_coef,'color',cmap(cindex,:) )
+    hold on
+    
+end
+
+figure(4)
+xlabel('SWIFT H_s [m]'), ylabel('DAS H_s [m]')
+plot([0 1],[0 1],'k:')
+print('-dpng',[ DASdatapath '/Hscatter_allchannels.png' ])
+
+figure(5)
+xlabel('f [Hz]'), ylabel('E coef')
+print('-dpng',[ DASdatapath '/Ecoef_allchannels.png' ])
 
 
 
