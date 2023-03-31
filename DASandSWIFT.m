@@ -9,18 +9,35 @@ tic
 %DASdatapath = '/Users/jthomson/Desktop/dasncdf/';
 DASdatapath = '/Volumes/Data/BeaufortChukchi/OliktokDAS/DAS_Aug2022';
 
-channel = [100:20:18400];
+channel = [100:20:18400]; %7960
 plotflag = false;
 movieflag = false;
+minHs = 0.2; % min wave height
+fs_DAS = 2; 
+fs_SWIFT = 25;
 
-%% SWIFT data
+%% depth attenuation
+%load('/Volumes/Data/BeaufortChukchi/OliktokDAS/depthattenuation.mat','f','depth','channel','attenuation');
+load('/Volumes/Data/BeaufortChukchi/OliktokDAS/depthattenuation.mat','attenuation');  % freq x channel (42 x 916 or 85 x 916 for extended freq)
 
-load('/Users/jthomson/Dropbox/Projects/ArcticCable/2022/SWIFT18_postprocessed/SWIFT18_CODAS_Aug2022_reprocessedIMU_RCprefitler_cleaned.mat')
-for si=1:length(SWIFT)
-    E_SWIFT(si,:) = SWIFT(si).wavespectra.energy;
-end
+%% SWIFT data, with option to reprocess for higher freq (max 1 Hz instead of 0.5 Hz)
+
+%load('/Users/jthomson/Dropbox/Projects/ArcticCable/2022/SWIFT18_postprocessed/SWIFT18_CODAS_Aug2022_reprocessedIMU_RCprefitler_cleaned.mat')
+load('/Volumes/Data/BeaufortChukchi/OliktokDAS/SWIFT18_OliktokPt_Aug2022/SWIFT18_OliktokPt_Aug2022_reprocessedIMU_RCprefilter_displacements.mat')
 f = SWIFT(1).wavespectra.freq;
 df = median(diff(f));
+newf = [f(1):df:1]; 
+f = newf;
+
+for si=1:length(SWIFT)
+    if length(isfinite(SWIFT(si).z)) > 10000
+        %E_SWIFT(si,:) = SWIFT(si).wavespectra.energy;
+        [newE f ] = pwelch(SWIFT(si).z(isfinite(SWIFT(si).z) ),[],[],f,fs_SWIFT);
+        E_SWIFT(si,:) = newE;
+    else
+      E_SWIFT(si,:) = NaN(1,length(f));
+    end
+end
 time_SWIFT = [SWIFT.time];
 Hs_SWIFT = [SWIFT.sigwaveheight];
 
@@ -50,16 +67,17 @@ for ci=1:length(channel) % position loop
 
         % spectra
         cleandata = filloutliers( detrend(data), 'linear');
-        [thisE thisf ] = pwelch(data,[],[],[],2);
-        E_DAS(fi,:) = interp1(thisf, thisE, f); % interpolate onto SWIFT frequencies
+        [thisE thisf ] = pwelch(data,[],[],[],fs_DAS);
+        E_DAS_raw(fi,:) = interp1(thisf, thisE, f); % interpolate onto SWIFT frequencies
+        E_DAS_depthcorrected(fi,:) = E_DAS_raw(fi,:) .* attenuation(:,fi)';
 
         % compare with SWIFT
         [tdiff matchedindex] = min( abs( time_DAS(fi) - time_SWIFT ) );
-        if tdiff < 1/24
-            E_ratio(fi,:) = E_SWIFT(matchedindex,:) ./ E_DAS(fi,:);
+        if tdiff < 1/24 & Hs_SWIFT(matchedindex) > minHs
+            E_ratio(fi,:) = E_SWIFT(matchedindex,:) ./ E_DAS_depthcorrected(fi,:);
             Hs_SWIFT_atDAStime(fi) = Hs_SWIFT(matchedindex);
         else
-            E_ratio(fi,:) = NaN * E_SWIFT(matchedindex,:) ./ E_DAS(fi,:);
+            E_ratio(fi,:) = NaN * E_SWIFT(matchedindex,:) ./ E_DAS_raw(fi,:);
             Hs_SWIFT_atDAStime = NaN;
         end
 
@@ -69,7 +87,7 @@ for ci=1:length(channel) % position loop
             plot(data,'b'), hold on, plot(cleandata,'r')
             title(flist(fi).name)
             subplot(2,1,2)
-            loglog(thisf,thisE,'b', f,E_DAS(fi,:),'r');
+            loglog(f,E_SWIFT(matchedindex,:),'k:',thisf,thisE,'b', f,E_DAS_raw(fi,:),'r',f,E_DAS_depthcorrected(fi,:),'g');
             axis square
             currFrame = getframe(gcf);
             writeVideo(vidObj,currFrame);
@@ -81,9 +99,9 @@ for ci=1:length(channel) % position loop
 
     close(vidObj);
     
-    E_coef = nanmean(E_ratio); % time average of the ratio at each frequency
+    E_coef = nanmedian(E_ratio); % time average of the ratio at each frequency
     E_coefstddev = nanstd(E_ratio); % standard deviation of the ratio at each frequency
-    E_DAS = E_DAS.*E_coef; % calibrated sea surface elevation energy spectra from the DAS
+    E_DAS = E_DAS_depthcorrected.*E_coef; % calibrated sea surface elevation energy spectra from the DAS
 
     Hs_DAS = 4*nansum(E_DAS.*df,2).^.5;
 

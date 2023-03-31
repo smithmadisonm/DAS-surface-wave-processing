@@ -13,6 +13,9 @@ print('-dpng','/Volumes/Data/BeaufortChukchi/OliktokDAS/CODAS_depthprofile.png')
 %% frequencies to use (match SWIFT)
 load('/Users/jthomson/Dropbox/Projects/ArcticCable/2022/SWIFT18_postprocessed/SWIFT18_CODAS_Aug2022_reprocessedIMU_RCprefitler_cleaned.mat')
 f = SWIFT(1).wavespectra.freq;
+df = median(diff(f));
+newf = [f(1):df:1]; 
+f = newf;
 
 %%
 
@@ -25,7 +28,7 @@ for ci=1:length(channel)
     
     if depth(ci) > 0
         for fi=1:length(f),
-            k(fi) = wavenumber( f(fi), depth(ci) );
+            k(fi) = wavenumber( f(fi), depth(ci) );  % from SWIFT codes repo
         end
         
         attenuation(:, ci) = cosh( k .* depth(ci) ) ;
@@ -46,13 +49,15 @@ figure(1), clf
 cmap = colormap;
 
 for ci=1:100:length(channel) 
-    ci
+   
     cindex = ceil(ci./length(channel)*length(cmap));
-    loglog(f,attenuation,'color',cmap(cindex,:) )
+    loglog(f,attenuation(:,ci),'color',cmap(cindex,:) )
     hold on
     
 end
 
+xlabel('frequency [Hz]'), ylabel('depth attenuation []')
+title('Oliktok DAS, color is channel')
 print('-dpng','/Volumes/Data/BeaufortChukchi/OliktokDAS/depthattenuation_spectral.png');
 
 
