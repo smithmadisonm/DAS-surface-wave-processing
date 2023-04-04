@@ -164,9 +164,9 @@ for ci=1:length(channel) % position loop
     figure(4), clf
     plot(Hs_SWIFT_atDAStime, Hs_DAS, 'kx', Hs_SWIFT_atDAStime, Hs_DAS_var, 'rx')
     xlabel('SWIFT H_s [m]'), ylabel('DAS H_s [m]')
-    print('-dpng',[DASdatapath  '/' num2str(channel(ci)) '/DAS-SWIFTcompare_channel'  num2str(channel(ci)) '_Hs.png'])
     legend(['spectral Hs, R^2 = ' num2str(corr(Hs_SWIFT_atDAStime(isfinite(Hs_DAS))', Hs_DAS(isfinite(Hs_DAS))).^2)]... 
         ,['variance Hs, R^2 = ' num2str(corr(Hs_SWIFT_atDAStime(isfinite(Hs_DAS_var))', Hs_DAS_var(isfinite(Hs_DAS_var))').^2)])
+    print('-dpng',[DASdatapath  '/' num2str(channel(ci)) '/DAS-SWIFTcompare_channel'  num2str(channel(ci)) '_Hs.png'])
 
     else
     end
