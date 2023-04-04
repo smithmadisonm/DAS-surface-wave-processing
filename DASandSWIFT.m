@@ -6,24 +6,28 @@ clear all, close all
 
 tic
 
-%DASdatapath = '/Users/jthomson/Desktop/dasncdf/';
-DASdatapath = '/Volumes/Data/BeaufortChukchi/OliktokDAS/DAS_Aug2022';
+DASdatapath = '/Users/jthomson/Desktop/ArcticCable_local/dasncdf/';
+%DASdatapath = '/Volumes/Data/BeaufortChukchi/OliktokDAS/DAS_Aug2022';
 
-channel = [100:20:18400]; %7960
-plotflag = false;
+channel = 7960%[100:20:18400]; %7960
+plotflag = true;
 movieflag = false;
-minHs = 0.2; % min wave height
+minHs = 0.05; % min wave height
 fs_DAS = 2; 
 fs_SWIFT = 25;
 
 %% depth attenuation
 %load('/Volumes/Data/BeaufortChukchi/OliktokDAS/depthattenuation.mat','f','depth','channel','attenuation');
-load('/Volumes/Data/BeaufortChukchi/OliktokDAS/depthattenuation.mat','attenuation');  % freq x channel (42 x 916 or 85 x 916 for extended freq)
+%load('/Volumes/Data/BeaufortChukchi/OliktokDAS/depthattenuation.mat','attenuation');  % freq x channel (42 x 916 or 85 x 916 for extended freq)
+load('~/Dropbox/Projects/ArcticCable/2022/DAS/depthattenuation.mat','attenuation');  % freq x channel (42 x 916 or 85 x 916 for extended freq)
+
 
 %% SWIFT data, with option to reprocess for higher freq (max 1 Hz instead of 0.5 Hz)
 
 %load('/Users/jthomson/Dropbox/Projects/ArcticCable/2022/SWIFT18_postprocessed/SWIFT18_CODAS_Aug2022_reprocessedIMU_RCprefitler_cleaned.mat')
-load('/Volumes/Data/BeaufortChukchi/OliktokDAS/SWIFT18_OliktokPt_Aug2022/SWIFT18_OliktokPt_Aug2022_reprocessedIMU_RCprefilter_displacements.mat')
+%load('/Volumes/Data/BeaufortChukchi/OliktokDAS/SWIFT18_OliktokPt_Aug2022/SWIFT18_OliktokPt_Aug2022_reprocessedIMU_RCprefilter_displacements.mat')
+load('~/Dropbox/Projects/ArcticCable/2022/SWIFT18_postprocessed/SWIFT18_OliktokPt_Aug2022_reprocessedIMU_RCprefilter_displacements.mat')
+
 f = SWIFT(1).wavespectra.freq;
 df = median(diff(f));
 newf = [f(1):df:1]; 
@@ -34,16 +38,18 @@ for si=1:length(SWIFT)
         %E_SWIFT(si,:) = SWIFT(si).wavespectra.energy;
         [newE f ] = pwelch(SWIFT(si).z(isfinite(SWIFT(si).z) ),[],[],f,fs_SWIFT);
         E_SWIFT(si,:) = newE;
+        Hs_SWIFT(si) = 4 * nansum(newE*df).^0.5;
+        var_SWIFT(si) = var( SWIFT(si).z(isfinite(SWIFT(si).z) ) );
     else
       E_SWIFT(si,:) = NaN(1,length(f));
+      Hs_SWIFT(si) = NaN;
+      var_SWIFT(si) = NaN;
     end
 end
 time_SWIFT = [SWIFT.time];
-Hs_SWIFT = [SWIFT.sigwaveheight];
+%Hs_SWIFT = [SWIFT.sigwaveheight];
 
 %% loop thru DAS data, in directories by channel (location) and files by time
-
-
 
 for ci=1:length(channel) % position loop
 
@@ -70,14 +76,17 @@ for ci=1:length(channel) % position loop
         [thisE thisf ] = pwelch(data,[],[],[],fs_DAS);
         E_DAS_raw(fi,:) = interp1(thisf, thisE, f); % interpolate onto SWIFT frequencies
         E_DAS_depthcorrected(fi,:) = E_DAS_raw(fi,:) .* attenuation(:,fi)';
+        var_DAS(fi) = var(data);
 
         % compare with SWIFT
         [tdiff matchedindex] = min( abs( time_DAS(fi) - time_SWIFT ) );
         if tdiff < 1/24 & Hs_SWIFT(matchedindex) > minHs
             E_ratio(fi,:) = E_SWIFT(matchedindex,:) ./ E_DAS_depthcorrected(fi,:);
+            var_ratio(fi) = var_SWIFT(matchedindex) ./ var_DAS(fi);
             Hs_SWIFT_atDAStime(fi) = Hs_SWIFT(matchedindex);
         else
-            E_ratio(fi,:) = NaN * E_SWIFT(matchedindex,:) ./ E_DAS_raw(fi,:);
+            E_ratio(fi,:) = NaN * E_SWIFT(matchedindex,:) ./ E_DAS_depthcorrected(fi,:);
+            var_ratio(fi) = NaN;
             Hs_SWIFT_atDAStime = NaN;
         end
 
@@ -100,10 +109,14 @@ for ci=1:length(channel) % position loop
     close(vidObj);
     
     E_coef = nanmedian(E_ratio); % time average of the ratio at each frequency
+    var_coef = nanmedian(var_ratio); % time average of the variance ratio
     E_coefstddev = nanstd(E_ratio); % standard deviation of the ratio at each frequency
+    var_coefstdev = nanstd(var_ratio);
     E_DAS = E_DAS_depthcorrected.*E_coef; % calibrated sea surface elevation energy spectra from the DAS
+    var_DAS = var_DAS .* var_coef; % calibrated variance
 
     Hs_DAS = 4*nansum(E_DAS.*df,2).^.5;
+    Hs_DAS_var = 4*(var_DAS).^.5;
 
     save([DASdatapath '/' num2str(channel(ci))  '/DASspecta_channel'  num2str(channel(ci)) '.mat'],'E*','f*','time*','Hs*')
 
@@ -124,7 +137,7 @@ for ci=1:length(channel) % position loop
     subplot(3,1,2)
     pcolor(time_DAS,f,log10(E_DAS'))
     shading flat
-    axis([ax(1) ax(2) 0 0.5])
+    axis([ax(1) ax(2) 0 1])
     datetick('x','keeplimits')
     legend('DAS')
     ylabel('f [Hz]')
@@ -134,7 +147,7 @@ for ci=1:length(channel) % position loop
     pcolor([SWIFT.time],f,log10(E_SWIFT'))
     shading flat
     datetick
-    axis([ax(1) ax(2) 0 0.5])
+    axis([ax(1) ax(2) 0 1])
     legend('SWIFT')
     ylabel('f [Hz]')
 
@@ -148,6 +161,13 @@ for ci=1:length(channel) % position loop
     title(['DAS channel ' num2str(channel(ci))])
     print('-dpng',[DASdatapath  '/' num2str(channel(ci)) '/Eratio_channel'  num2str(channel(ci)) '.png'])
   
+    figure(4), clf
+    plot(Hs_SWIFT_atDAStime, Hs_DAS, 'kx', Hs_SWIFT_atDAStime, Hs_DAS_var, 'rx')
+    xlabel('SWIFT H_s [m]'), ylabel('DAS H_s [m]')
+    print('-dpng',[DASdatapath  '/' num2str(channel(ci)) '/DAS-SWIFTcompare_channel'  num2str(channel(ci)) '_Hs.png'])
+    legend(['spectral Hs, R^2 = ' num2str(corr(Hs_SWIFT_atDAStime(isfinite(Hs_DAS))', Hs_DAS(isfinite(Hs_DAS))).^2)]... 
+        ,['variance Hs, R^2 = ' num2str(corr(Hs_SWIFT_atDAStime(isfinite(Hs_DAS_var))', Hs_DAS_var(isfinite(Hs_DAS_var))').^2)])
+
     else
     end
 
@@ -163,13 +183,13 @@ for ci=1:length(channel)
     
     load([DASdatapath '/' num2str(channel(ci))  '/DASspecta_channel'  num2str(channel(ci)) '.mat'])
     
-    figure(4), 
+    figure(5), 
     cmap = colormap;
     cindex = ceil(ci./length(channel)*length(cmap));
     plot(Hs_SWIFT_atDAStime,Hs_DAS,'.','color',cmap(cindex,:))
     hold on
     
-    figure(5),
+    figure(6),
     cmap = colormap;
     cindex = ceil(ci./length(channel)*length(cmap));
     loglog(f,E_coef,'color',cmap(cindex,:) )
@@ -177,12 +197,12 @@ for ci=1:length(channel)
     
 end
 
-figure(4)
+figure(5)
 xlabel('SWIFT H_s [m]'), ylabel('DAS H_s [m]')
 plot([0 1],[0 1],'k:')
 print('-dpng',[ DASdatapath '/Hscatter_allchannels.png' ])
 
-figure(5)
+figure(6)
 xlabel('f [Hz]'), ylabel('E coef')
 print('-dpng',[ DASdatapath '/Ecoef_allchannels.png' ])
 
