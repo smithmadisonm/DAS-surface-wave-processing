@@ -37,15 +37,33 @@ for si=1:length(SWIFT)
     if length(isfinite(SWIFT(si).z)) > 10000
         %E_SWIFT(si,:) = SWIFT(si).wavespectra.energy;
         [newE f ] = pwelch(SWIFT(si).z(isfinite(SWIFT(si).z) ),[],[],f,fs_SWIFT);
-        E_SWIFT(si,:) = newE;
-        Hs_SWIFT(si) = 4 * nansum(newE*df).^0.5;
+        E_SWIFT(si,:) = newE;  
+        Hs_SWIFT(si) = 4 * nansum(newE*df).^0.5; SWIFT(si).sigwaveheight = 4 * nansum(newE*df).^0.5;
         var_SWIFT(si) = var( SWIFT(si).z(isfinite(SWIFT(si).z) ) );
+        SWIFT(si).wavespectra.energy = newE'; 
+        SWIFT(si).wavespectra.freq = f';
     else
-      E_SWIFT(si,:) = NaN(1,length(f));
+      E_SWIFT(si,:) = NaN(1,length(f)); 
       Hs_SWIFT(si) = NaN;
       var_SWIFT(si) = NaN;
+      SWIFT(si).wavespectra.energy = NaN(1,length(f))'; 
+      SWIFT(si).wavespectra.freq = f';
     end
+      SWIFT(si).wavespectra.a1 = NaN(1,length(f))'; 
+      SWIFT(si).wavespectra.b1 = NaN(1,length(f))'; 
+      SWIFT(si).wavespectra.a2 = NaN(1,length(f))'; 
+      SWIFT(si).wavespectra.b2 = NaN(1,length(f))'; 
+      SWIFT(si).wavespectra.check = NaN(1,length(f))';     
 end
+
+SWIFT = rmfield(SWIFT,'x');
+SWIFT = rmfield(SWIFT,'y');
+SWIFT = rmfield(SWIFT,'z');
+SWIFT = rmfield(SWIFT,'u');
+SWIFT = rmfield(SWIFT,'v');
+SWIFT = rmfield(SWIFT,'rawlon');
+SWIFT = rmfield(SWIFT,'rawlat');
+
 time_SWIFT = [SWIFT.time];
 %Hs_SWIFT = [SWIFT.sigwaveheight];
 
