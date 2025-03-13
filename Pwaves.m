@@ -22,7 +22,7 @@ function [ Hs, Tp, Hig, Tig, E, f ] = Pwaves(p,fs)
   
 
 %% fixed parameters
-wsecs = 1800;   % window length in seconds, should make 2^N samples
+wsecs = 900;   % window length in seconds, should make 2^N samples
 merge = 1;      % freq bands to merge, must be odd?
 maxf = 1;       % frequency cutoff for output
    

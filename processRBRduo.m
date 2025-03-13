@@ -24,7 +24,7 @@ plotspectra = false;
 
 %% fixed params
 
-burstsecs = 3600; % burst length in seconds
+burstsecs = 1800; % burst length in seconds
 atm = 10.13; % atmospheric pressure offset (dB)
 mindepth = 1; % detect out-of-water times
 minwaveheight = 0.05; % minimum wave height observable (signal to noise issue)
