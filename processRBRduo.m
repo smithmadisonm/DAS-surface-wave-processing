@@ -18,7 +18,7 @@ filename = 'ArcticCable_Site3_Apr-Sep2023'; lat = 70.7394; lon = -150.003;
 
 
 t1 = datenum(2023,4,18); % start time
-t2 = now; % end time
+t2 = datenum(2023,9,22); % end time
 
 plotspectra = false;
 
