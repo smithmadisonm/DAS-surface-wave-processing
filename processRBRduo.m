@@ -14,11 +14,14 @@ clear all, close all
 %filename = '203193_20220903_0202_T1C'; lat = NaN; lon = NaN;
 %filename = 'ArcticCable_Site1_Apr-Sep2023'; lat = 70.5594; lon = -150.0071;
 %filename = 'ArcticCable_Site2_Apr-Sep2023'; lat = 70.6546; lon = -150.0001;
-filename = 'ArcticCable_Site3_Apr-Sep2023'; lat = 70.7394; lon = -150.003;
+%filename = 'ArcticCable_Site3_Apr-Sep2023'; lat = 70.7394; lon = -150.003;
+%filename = 'MBanchor_RBR_16-25Jun2025'; lat = 46.690149; lon = -124.003540; %46.690149 -124.003540
+%filename = 'MCanchor_RBR_17-26Jun2025'; lat = 46.717835; lon = -124.084016; 
+filename = 'OSanchor_RBR_17-26Jun2025'; lat = 46.72183; lon = -124.15081; 
 
 
-t1 = datenum(2023,4,18); % start time
-t2 = datenum(2023,9,22); % end time
+t1 = datenum(2025,6,16); % start time
+t2 = datenum(2025,6,26); % end time
 
 plotspectra = false;
 
@@ -220,6 +223,7 @@ pcolor([RBR.time],f,log10(E'))
 shading flat
 datetick
 ylabel('f [Hz]')
+set(gca,'yscale','log')
 title([filename],'interpreter','none')
 
 print('-dpng',[filename  '_' datestr(t1,1) '_' datestr(t2,1) '_spectrogram.png'])
